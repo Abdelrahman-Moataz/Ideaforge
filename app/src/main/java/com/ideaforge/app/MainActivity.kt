@@ -39,6 +39,11 @@ private fun IdeaForgeApp(store: IdeaStore) {
     var problem by remember { mutableStateOf("") }
     var audience by remember { mutableStateOf("") }
     var solution by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("Personal") }
+    var notes by remember { mutableStateOf("") }
+    var screen by remember { mutableStateOf("home") }
+    var aiPrompt by remember { mutableStateOf("") }
+    var aiResponse by remember { mutableStateOf("") }
     val selected = ideas.firstOrNull { it.id == selectedId }
     fun refresh() { ideas = store.all() }
     MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Background, surface = Panel)) {
@@ -52,11 +57,14 @@ private fun IdeaForgeApp(store: IdeaStore) {
                     IdeaInput("PROBLEM *", problem, { problem = it }, "What problem does it solve?", 3)
                     IdeaInput("TARGET CUSTOMER", audience, { audience = it }, "Who has this problem?")
                     IdeaInput("PROPOSED SOLUTION", solution, { solution = it }, "How would your idea help?", 3)
+                    Text("CATEGORY", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("Personal", "Work", "Learning", "Other").forEach { item -> FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) }) } }
+                    IdeaInput("NOTES (OPTIONAL)", notes, { notes = it }, "Extra thoughts or assumptions", 2)
                     Spacer(Modifier.weight(1f))
                     Button(onClick = {
-                        val idea = Idea(name = name.trim(), problem = problem.trim(), audience = audience.trim(), solution = solution.trim())
+                        val idea = Idea(name = name.trim(), problem = problem.trim(), audience = audience.trim(), solution = solution.trim(), category = category, notes = notes.trim())
                         store.save(idea); refresh(); selectedId = idea.id
-                        name = ""; problem = ""; audience = ""; solution = ""; creating = false
+                        name = ""; problem = ""; audience = ""; solution = ""; notes = ""; category = "Personal"; creating = false
                     }, enabled = name.isNotBlank() && problem.isNotBlank(), modifier = Modifier.fillMaxWidth().height(52.dp)) {
                         Text("Create my roadmap →")
                     }
@@ -95,7 +103,40 @@ private fun IdeaForgeApp(store: IdeaStore) {
                             }
                         }
                     }
+                    if (selected.notes.isNotBlank()) item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(16.dp)).padding(16.dp)) { Text("NOTES", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.height(6.dp)); Text(selected.notes) } }
                     item { OutlinedButton(onClick = { store.delete(selected.id); refresh(); selectedId = null }, modifier = Modifier.fillMaxWidth()) { Text("Delete idea") } }
+                }
+                screen == "assistant" -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    item { Text("‹ Workspace", color = Accent, modifier = Modifier.clickable { screen = "home" }); Text("AI Assistant", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("Get structured prompts to think through your idea.", color = Muted) }
+                    item {
+                        Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Idea coach", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text("This is a local demo assistant. It does not call an AI service or verify market data.", color = Muted, fontSize = 12.sp)
+                            IdeaInput("WHAT ARE YOU WORKING ON?", aiPrompt, { aiPrompt = it }, "Describe your idea or challenge", 4)
+                            Button(onClick = {
+                                aiResponse = if (aiPrompt.isBlank()) "Add a short description first." else "Try this next:\n\n1. Name the specific customer and the moment they feel the problem.\n2. Write down how they solve it today.\n3. Speak to five potential customers before building.\n4. Define one measurable signal that would prove your idea is useful.\n5. Test the smallest possible version and record what you learn.\n\nQuestions to investigate: Who needs this most? What would make them switch? What evidence would disprove your assumption?"
+                            }, modifier = Modifier.fillMaxWidth()) { Text("Generate coaching checklist") }
+                        }
+                    }
+                    if (aiResponse.isNotBlank()) item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(16.dp)).padding(16.dp)) { Text("SUGGESTED NEXT STEPS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp); Spacer(Modifier.height(10.dp)); Text(aiResponse) } }
+                    item { Text("Quick prompts", fontWeight = FontWeight.Bold, fontSize = 18.sp) }
+                    items(listOf("How can I test demand cheaply?", "What assumptions should I validate?", "How should I define my first MVP?")) { prompt ->
+                        OutlinedButton(onClick = { aiPrompt = prompt; aiResponse = "" }, modifier = Modifier.fillMaxWidth()) { Text(prompt) }
+                    }
+                }
+                screen == "profile" -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    item { Text("‹ Workspace", color = Accent, modifier = Modifier.clickable { screen = "home" }); Text("Profile", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("Your IdeaForge workspace", color = Muted) }
+                    item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.size(56.dp).background(Accent, RoundedCornerShape(28.dp)), contentAlignment = Alignment.Center) { Text("IF", color = Background, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                        Text("Local workspace", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text("No account connected", color = Muted)
+                        Divider(color = Muted.copy(alpha = 0.25f))
+                        Text("Total ideas: ${ideas.size}")
+                        Text("Tasks completed: ${ideas.sumOf { idea -> idea.tasks.count { it.done } }}")
+                        Text("Tasks remaining: ${ideas.sumOf { idea -> idea.tasks.count { !it.done } }}")
+                    } }
+                    item { Text("Settings & capabilities", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                    item { Text("Ideas are stored on this device only. There is no login, account sync, cloud backup, or AI API configured in this version.", color = Muted) }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     item {
@@ -112,6 +153,10 @@ private fun IdeaForgeApp(store: IdeaStore) {
                             Spacer(Modifier.height(8.dp)); Text("Capture it. Test it. Build it.", color = Muted)
                             Spacer(Modifier.height(18.dp))
                             Button(onClick = { creating = true }, modifier = Modifier.fillMaxWidth().height(50.dp)) { Text("+  Create a new idea") }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(onClick = { screen = "assistant" }, modifier = Modifier.weight(1f)) { Text("✦ AI Assistant") }
+                                OutlinedButton(onClick = { screen = "profile" }, modifier = Modifier.weight(1f)) { Text("Profile") }
+                            }
                         }
                     }
                     item { Text("Your workspace", fontSize = 20.sp, fontWeight = FontWeight.Bold); Text("${ideas.size} saved projects", color = Muted) }
@@ -126,7 +171,7 @@ private fun IdeaForgeApp(store: IdeaStore) {
                             Spacer(Modifier.height(6.dp)); LinearProgressIndicator(progress = { idea.progress / 100f }, modifier = Modifier.fillMaxWidth(), color = Accent)
                         }
                     }
-                    item { Text("Ideas are saved locally on this device. Market validation and AI features are not connected in this MVP.", color = Muted, fontSize = 12.sp) }
+                    item { Text("Ideas are saved locally. The assistant is a demo checklist, not a live AI service.", color = Muted, fontSize = 12.sp) }
                 }
             }
         }
