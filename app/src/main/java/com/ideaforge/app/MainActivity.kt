@@ -49,6 +49,7 @@ private fun IdeaForgeApp(store: IdeaStore) {
     var screen by remember { mutableStateOf("home") }
     var aiPrompt by remember { mutableStateOf("") }
     var aiResponse by remember { mutableStateOf("") }
+    var aiLoading by remember { mutableStateOf(false) }
     val selected = ideas.firstOrNull { it.id == selectedId }
     fun refresh() { ideas = store.all() }
     MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Background, surface = Panel)) {
@@ -131,18 +132,40 @@ private fun IdeaForgeApp(store: IdeaStore) {
                     item { OutlinedButton(onClick = { store.delete(selected.id); refresh(); selectedId = null }, modifier = Modifier.fillMaxWidth()) { Text("Delete idea") } }
                 }
                 screen == "assistant" -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    item { Text("‹ Workspace", color = Accent, modifier = Modifier.clickable { screen = "home" }); Text("AI Assistant", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("Get structured prompts to think through your idea.", color = Muted) }
+                    item { Text("‹ Workspace", color = Accent, modifier = Modifier.clickable { screen = "home" }); Text("AI Assistant", fontSize = 28.sp, fontWeight = FontWeight.Bold); Text("Get tailored feedback and practical next steps for your idea.", color = Muted) }
                     item {
                         Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Idea coach", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Text("This is a local demo assistant. It does not call an AI service or verify market data.", color = Muted, fontSize = 12.sp)
+                            Text("AI coaching powered by Gemini. Treat market claims as hypotheses to validate, not verified research.", color = Muted, fontSize = 12.sp)
                             IdeaInput("WHAT ARE YOU WORKING ON?", aiPrompt, { aiPrompt = it }, "Describe your idea or challenge", 4)
                             Button(onClick = {
-                                aiResponse = if (aiPrompt.isBlank()) "Add a short description first." else "Try this next:\n\n1. Name the specific customer and the moment they feel the problem.\n2. Write down how they solve it today.\n3. Speak to five potential customers before building.\n4. Define one measurable signal that would prove your idea is useful.\n5. Test the smallest possible version and record what you learn.\n\nQuestions to investigate: Who needs this most? What would make them switch? What evidence would disprove your assumption?"
-                            }, modifier = Modifier.fillMaxWidth()) { Text("Generate coaching checklist") }
+                                if (aiPrompt.isBlank()) {
+                                    aiResponse = "Describe your idea or ask a specific question first."
+                                } else {
+                                    aiLoading = true
+                                    aiResponse = ""
+                                    scope.launch {
+                                        try {
+                                            aiResponse = IdeaCoachRepository().ask(
+                                                prompt = aiPrompt,
+                                                ideaContext = selected?.let {
+                                                    "Idea: ${it.name}\nProblem: ${it.problem}\nAudience: ${it.audience}\nSolution: ${it.solution}\nCategory: ${it.category}"
+                                                }.orEmpty()
+                                            )
+                                        } catch (e: Exception) {
+                                            aiResponse = "I couldn't reach the AI coach. Check your connection, sign-in session, and Supabase Edge Function setup.\n\nDetails: ${e.message ?: "Unknown error"}"
+                                        } finally {
+                                            aiLoading = false
+                                        }
+                                    }
+                                }
+                            }, enabled = !aiLoading, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (aiLoading) "Thinking…" else "Ask AI coach")
+                            }
                         }
                     }
-                    if (aiResponse.isNotBlank()) item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(16.dp)).padding(16.dp)) { Text("SUGGESTED NEXT STEPS", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp); Spacer(Modifier.height(10.dp)); Text(aiResponse) } }
+                    if (aiLoading) item { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Accent, strokeWidth = 2.dp); Text("Thinking through your idea…", color = Muted) } }
+                    if (aiResponse.isNotBlank()) item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(16.dp)).padding(16.dp)) { Text("AI COACH RESPONSE", color = Accent, fontWeight = FontWeight.Bold, fontSize = 11.sp); Spacer(Modifier.height(10.dp)); Text(aiResponse) } }
                     item { Text("Quick prompts", fontWeight = FontWeight.Bold, fontSize = 18.sp) }
                     items(listOf("How can I test demand cheaply?", "What assumptions should I validate?", "How should I define my first MVP?")) { prompt ->
                         OutlinedButton(onClick = { aiPrompt = prompt; aiResponse = "" }, modifier = Modifier.fillMaxWidth()) { Text(prompt) }
@@ -153,14 +176,14 @@ private fun IdeaForgeApp(store: IdeaStore) {
                     item { Column(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(20.dp)).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(Modifier.size(56.dp).background(Accent, RoundedCornerShape(28.dp)), contentAlignment = Alignment.Center) { Text("IF", color = Background, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
                         Text("Local workspace", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        Text("No account connected", color = Muted)
+                        Text(signedInEmail.ifBlank { "Signed-in workspace" }, color = Muted)
                         Divider(color = Muted.copy(alpha = 0.25f))
                         Text("Total ideas: ${ideas.size}")
                         Text("Tasks completed: ${ideas.sumOf { idea -> idea.tasks.count { it.done } }}")
                         Text("Tasks remaining: ${ideas.sumOf { idea -> idea.tasks.count { !it.done } }}")
                     } }
                     item { Text("Settings & capabilities", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-                    item { Text("Ideas are stored on this device only. There is no login, account sync, cloud backup, or AI API configured in this version.", color = Muted) }
+                    item { Text("IdeaForge uses Supabase authentication and cloud features. AI coaching requires the deployed idea-coach Edge Function and a server-side Gemini API key.", color = Muted) }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     item {
@@ -195,7 +218,7 @@ private fun IdeaForgeApp(store: IdeaStore) {
                             Spacer(Modifier.height(6.dp)); LinearProgressIndicator(progress = { idea.progress / 100f }, modifier = Modifier.fillMaxWidth(), color = Accent)
                         }
                     }
-                    item { Text("Ideas are saved locally. The assistant is a demo checklist, not a live AI service.", color = Muted, fontSize = 12.sp) }
+                    item { Text("Your ideas are saved locally and migration preserves the original SQLite records. AI responses are generated on demand.", color = Muted, fontSize = 12.sp) }
                 }
             }
         }
