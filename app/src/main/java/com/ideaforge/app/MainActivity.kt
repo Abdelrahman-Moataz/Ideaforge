@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 private val Accent = Color(0xFF9A8CFF)
 private val Background = Color(0xFF0B0D1A)
@@ -32,6 +33,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun IdeaForgeApp(store: IdeaStore) {
+    var isAuthenticated by remember { mutableStateOf(false) }
+    var signedInEmail by remember { mutableStateOf("") }
+    var cloudMessage by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     var ideas by remember { mutableStateOf(store.all()) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -47,6 +52,25 @@ private fun IdeaForgeApp(store: IdeaStore) {
     val selected = ideas.firstOrNull { it.id == selectedId }
     fun refresh() { ideas = store.all() }
     MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Background, surface = Panel)) {
+        if (!isAuthenticated) {
+            AuthScreen { _, email ->
+                signedInEmail = email
+                scope.launch {
+                    try {
+                        val auth = SupabaseAuthRepository()
+                        val userId = auth.currentUserId() ?: error("Signed in, but no user session was found.")
+                        CloudIdeaRepository().migrateLocalIdeas(userId, store.all())
+                        cloudMessage = "Signed in. Existing local ideas were safely checked for migration."
+                        refresh()
+                        isAuthenticated = true
+                    } catch (e: Exception) {
+                        cloudMessage = e.message ?: "Cloud migration failed. Your local ideas remain on this device."
+                        // Don't delete local data or block the user from accessing it.
+                        isAuthenticated = true
+                    }
+                }
+            }
+        } else {
         Surface(Modifier.fillMaxSize(), color = Background) {
             when {
                 creating -> Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -174,6 +198,7 @@ private fun IdeaForgeApp(store: IdeaStore) {
                     item { Text("Ideas are saved locally. The assistant is a demo checklist, not a live AI service.", color = Muted, fontSize = 12.sp) }
                 }
             }
+        }
         }
     }
 }
