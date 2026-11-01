@@ -1,4 +1,4 @@
-import java.util.Properties
+    import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -21,6 +21,10 @@ fun buildConfigString(name: String, fallback: String): String {
 }
 
 android {
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     namespace = "com.ideaforge.app"
     compileSdk = 35
     defaultConfig {
@@ -29,12 +33,18 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "2.0.0"
-        buildConfigField("String", "SUPABASE_URL", buildConfigString("SUPABASE_URL", ""))
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildConfigString("SUPABASE_PUBLISHABLE_KEY", ""))
+        buildConfigField("String", "SUPABASE_URL", buildConfigString("SUPABASE_URL", "https://jvqjgymftnohgbbcxkoo.supabase.co"))
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildConfigString("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_7Ihrd4QdbObH8khgUSqlKQ_IVwfsQEO"))
     }
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 

@@ -1,5 +1,6 @@
 package com.ideaforge.app
 
+import io.github.jan.supabase.gotrue.auth
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import io.ktor.client.request.header

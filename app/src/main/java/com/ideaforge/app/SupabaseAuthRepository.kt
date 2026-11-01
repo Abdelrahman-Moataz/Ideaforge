@@ -1,6 +1,7 @@
 package com.ideaforge.app
 
-import io.github.jan.supabase.auth.providers.Email
+import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.gotrue.providers.builtin.Email
 
 class SupabaseAuthRepository {
     private val client get() = SupabaseClientProvider.client
@@ -24,4 +25,5 @@ class SupabaseAuthRepository {
     }
 
     fun currentUserId(): String? = client.auth.currentUserOrNull()?.id
+    fun currentEmail(): String? = client.auth.currentUserOrNull()?.email
 }

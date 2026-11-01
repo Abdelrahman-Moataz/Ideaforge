@@ -33,8 +33,15 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun IdeaForgeApp(store: IdeaStore) {
-    var isAuthenticated by remember { mutableStateOf(false) }
-    var signedInEmail by remember { mutableStateOf("") }
+    val initialAuth = remember {
+        SupabaseClientProvider.isConfigured && SupabaseAuthRepository().currentUserId() != null
+    }
+    var isAuthenticated by remember { mutableStateOf(initialAuth) }
+    var signedInEmail by remember {
+        mutableStateOf(
+            if (SupabaseClientProvider.isConfigured) SupabaseAuthRepository().currentEmail().orEmpty() else ""
+        )
+    }
     var cloudMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     var ideas by remember { mutableStateOf(store.all()) }
@@ -184,6 +191,20 @@ private fun IdeaForgeApp(store: IdeaStore) {
                     } }
                     item { Text("Settings & capabilities", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                     item { Text("IdeaForge uses Supabase authentication and cloud features. AI coaching requires the deployed idea-coach Edge Function and a server-side Gemini API key.", color = Muted) }
+                    item {
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    runCatching { SupabaseAuthRepository().signOut() }
+                                    signedInEmail = ""
+                                    isAuthenticated = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Sign out of Supabase")
+                        }
+                    }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     item {
